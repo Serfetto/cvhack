@@ -1,7 +1,7 @@
 """Сквозная проверка работающей системы через шлюз: вход → камеры → событие по WebSocket → статус → статистика.
 
-    python tools/smoke.py                       # http://localhost:8080
-    python tools/smoke.py --base http://<vps>:8080 --timeout 120
+    python backend/server/tools/smoke.py                       # http://localhost:8080
+    python backend/server/tools/smoke.py --base http://<vps>:8080 --timeout 120
 """
 
 from __future__ import annotations

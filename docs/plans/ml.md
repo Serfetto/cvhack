@@ -8,13 +8,13 @@
 
 | Что | Где |
 |---|---|
-| Датасеты, свои ролики, разметка интервалов нарушений | `ml/datasets/`, `data/eval/` |
-| Обучение и дообучение YOLO | `ml/training/` |
-| Экспорт в ONNX, обрезка головы, квантование, компиляция `.tpu` | `ml/export/`, `ml/compile/` |
-| Пре- и постпроцессинг (общие для CPU и TPU) | `services/inference/ml_runtime/` |
-| Бэкенды `onnx`, `pytpu`, `remote` и `tpu-worker` на стенде | `services/inference/backends/` |
-| Логика сценариев (`check()`), параметры и JSON Schema | `services/analytics/scenarios/` |
-| Бенчмарк и событийные метрики качества | `ml/benchmark/`, `ml/eval/` |
+| Датасеты, свои ролики, разметка интервалов нарушений | `backend/ml/datasets/`, `data/eval/` |
+| Обучение и дообучение YOLO | `backend/ml/training/` |
+| Экспорт в ONNX, обрезка головы, квантование, компиляция `.tpu` | `backend/ml/export/`, `backend/ml/compile/` |
+| Пре- и постпроцессинг (общие для CPU и TPU) | `backend/server/services/inference/ml_runtime/` |
+| Бэкенды `onnx`, `pytpu`, `remote` и `tpu-worker` на стенде | `backend/server/services/inference/backends/` |
+| Логика сценариев (`check()`), параметры и JSON Schema | `backend/server/services/analytics/scenarios/` |
+| Бенчмарк и событийные метрики качества | `backend/ml/benchmark/`, `backend/ml/eval/` |
 
 Каркас аналитики (трекинг, конечный автомат, реестр, очереди) пишет бэкендер. ML пишет только сами сценарии и подбирает пороги, включая параметры трекера.
 
@@ -36,7 +36,7 @@
   - [ ] запустить пример из `examples/` и записать время инференса ResNet50
 
   Результат: `docs/stand.md` и решение по режиму инференса (A1 / A2 / B / C) — сообщить в чат.
-- [ ] **Образ для компиляции** `ml/compile/Dockerfile`: `python:3.12.11-slim` + колёса из `tpu_framework/packets` (`pip install -r requirements.txt`). Проверка: собрать `torch_resnet50` скриптом `compile.py` из SDK и запустить полученный `.tpu` на стенде.
+- [ ] **Образ для компиляции** `backend/ml/compile/Dockerfile`: `python:3.12.11-slim` + колёса из `tpu_framework/packets` (`pip install -r requirements.txt`). Проверка: собрать `torch_resnet50` скриптом `compile.py` из SDK и запустить полученный `.tpu` на стенде.
 - [ ] **Первый экспорт** `yolov8n-pose` в ONNX:
   ```bash
   yolo export model=yolov8n-pose.pt format=onnx imgsz=640 opset=12 dynamic=False simplify=True
@@ -58,12 +58,12 @@
 - [ ] **Постпроцессинг на numpy** (`ml_runtime/post.py`): сборка выходов, DFL-декод, ключевые точки, NMS, обратный letterbox. **Сверка:** полная ONNX-модель против «подмодель + постпроцессинг» на 20 кадрах; совпадение боксов IoU > 0,95.
 - [ ] **До 23:00 передать бэкендеру:** `ml_runtime` (`preprocess`, `postprocess_pose`), `backends/onnx.py`, модель в `data/models/pose/`. От этого зависит сквозной путь.
 - [ ] **Калибровочный набор**: 300 кадров (свои ролики + стоковые видео цехов + кадры с людьми из COCO). Кадры после препроцессинга складываются в один массив `[N, 3, 640, 640]` по оси batch.
-- [ ] **Квантование и компиляция** `ml/compile/compile_tpu.py`:
+- [ ] **Квантование и компиляция** `backend/ml/compile/compile_tpu.py`:
   - `RegularModel(model).calibrate_torch(...)` → `quantize` → `compile_(TPU_H1M, network, O5)`; при ошибке автоматический откат на `O1`
   - если INT8 просаживает точность: `RegularModel(percentile=99.99)`, затем `fine_tune_torch`
   - на выходе `pose_b1_o5_h1m.tpu` + `meta.json`: входы и выходы, пресет, хэш, точность FP32 и INT8
 - [ ] **Запуск на TPU**: те же 100 кадров через `inference.sync()`, сравнить с ONNX FP32 (средний IoU по боксам и OKS по точкам).
-- [ ] **Бенчмарк** `ml/benchmark/bench_tpu.py`: прогрев 20 кадров, затем 500 прогонов; p50/p95 отдельно для `pre`, `tpu`, `post` и FPS. Отчёт — JSON (формат ниже).
+- [ ] **Бенчмарк** `backend/ml/benchmark/bench_tpu.py`: прогрев 20 кадров, затем 500 прогонов; p50/p95 отдельно для `pre`, `tpu`, `post` и FPS. Отчёт — JSON (формат ниже).
 - [ ] **Съёмка своих роликов (вся команда, 19:00–20:30) — рекомендация, кейс этого не требует.**
   - Нужна, если хотим метрики и гарантированное демо по телефону, бегу и сближению с техникой: открытых размеченных видео по ним нет.
   - Без съёмки: для падений берём CAUCAFall или Le2i, для остального — стоковые видео. Метрики тогда будут только по падениям.
@@ -97,7 +97,7 @@
   - `proximity`: расстояние между точками опоры человека и движущейся техники < k × рост ≥ 1 с; опционально гомография
   - `phone`: телефон рядом с кистью или головой ≥ 3 с
 - [ ] **Модель `objects`**: экспорт, обрезка головы, компиляция. Проверить, работают ли две программы на одном устройстве. Если нет: объединить классы в одну модель или чередовать модели по кадрам.
-- [ ] **`ml/eval/`** — событийные метрики на размеченных роликах (свои и/или CAUCAFall, Le2i):
+- [ ] **`backend/ml/eval/`** — событийные метрики на размеченных роликах (свои и/или CAUCAFall, Le2i):
   - precision и recall по интервалам: событие засчитано, если попало в размеченный интервал ± 2 с
   - ложные тревоги в час
   - время до тревоги, p50/p95
@@ -140,7 +140,7 @@ class FallScenario:
         ...
 ```
 
-**Отчёт бенчмарка** (`ml/benchmark/out/*.json`, его показывает страница «Производительность»):
+**Отчёт бенчмарка** (`backend/ml/benchmark/out/*.json`, его показывает страница «Производительность»):
 
 ```json
 {"model": "pose", "program": "yolov8n_pose_b1_o5_h1m.tpu", "backend": "pytpu", "batch": 1,

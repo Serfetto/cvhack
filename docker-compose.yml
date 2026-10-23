@@ -1,4 +1,5 @@
-# Вся система, кроме tpu-worker (он работает на стенде LinQ). Запуск: docker compose up -d --build
+# Вся система, кроме tpu-worker (он работает на стенде LinQ). Запуск из корня репозитория: docker compose up -d --build
+# Код: backend/server (сервисы, общая библиотека, инфраструктура), backend/ml (модели), frontend (SPA)
 # Шлюз: http://localhost:8080  ·  Swagger: /api/<auth|config|events|inference|ingest|analytics|notifications>/docs
 # Grafana: http://localhost:3000  ·  Prometheus: http://localhost:9090  ·  MinIO: http://localhost:9001
 name: linq-safety
@@ -71,11 +72,11 @@ services:
   mediamtx:
     image: bluenviron/mediamtx:1.9.3
     restart: unless-stopped
-    volumes: ["./infra/mediamtx.yml:/mediamtx.yml:ro"]
+    volumes: ["./backend/server/infra/mediamtx.yml:/mediamtx.yml:ro"]
     ports: ["8554:8554", "8888:8888", "8889:8889"]
 
   cams:
-    build: ./infra/cams
+    build: ./backend/server/infra/cams
     restart: unless-stopped
     environment:
       CAMS: ${DEMO_CAMS:-cam01 cam02 cam03 cam04}
@@ -92,13 +93,13 @@ services:
       - --api.dashboard=true
       - --api.insecure=true
       - --log.level=WARN
-    volumes: ["./infra/traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro"]
+    volumes: ["./backend/server/infra/traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro"]
     ports: ["${GATEWAY_PORT:-8080}:80", "8081:8080"]
 
   prometheus:
     image: prom/prometheus:v2.54.1
     restart: unless-stopped
-    volumes: ["./infra/prometheus.yml:/etc/prometheus/prometheus.yml:ro"]
+    volumes: ["./backend/server/infra/prometheus.yml:/etc/prometheus/prometheus.yml:ro"]
     ports: ["9090:9090"]
 
   grafana:
@@ -110,15 +111,15 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/linq.json
     volumes:
-      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./backend/server/infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./backend/server/infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
     ports: ["3000:3000"]
     depends_on: [prometheus]
 
   # --- сервисы --------------------------------------------------------------------------
   auth:
     <<: *svc
-    build: {context: ., dockerfile: services/Dockerfile, args: {SERVICE: auth}}
+    build: {context: ./backend/server, dockerfile: services/Dockerfile, args: {SERVICE: auth}}
     environment:
       <<: *env
       ROOT_PATH: /api/auth
@@ -127,14 +128,14 @@ services:
 
   camera:
     <<: *svc
-    build: {context: ., dockerfile: services/Dockerfile, args: {SERVICE: camera}}
+    build: {context: ./backend/server, dockerfile: services/Dockerfile, args: {SERVICE: camera}}
     environment:
       <<: *env
       ROOT_PATH: /api/config
 
   ingest:
     <<: *svc
-    build: {context: ., dockerfile: services/Dockerfile, args: {SERVICE: ingest, APT_PACKAGES: ffmpeg}}
+    build: {context: ./backend/server, dockerfile: services/Dockerfile, args: {SERVICE: ingest, APT_PACKAGES: ffmpeg}}
     environment:
       <<: *env
       ROOT_PATH: /api/ingest
@@ -142,7 +143,7 @@ services:
 
   inference:
     <<: *svc
-    build: {context: ., dockerfile: services/Dockerfile, args: {SERVICE: inference}}
+    build: {context: ./backend/server, dockerfile: services/Dockerfile, args: {SERVICE: inference}}
     environment:
       <<: *env
       ROOT_PATH: /api/inference
@@ -152,11 +153,11 @@ services:
       MAX_FRAME_AGE_S: ${MAX_FRAME_AGE_S:-2.0}
     volumes:
       - "./data:/app/data:ro"
-      - "./ml/benchmark/out:/app/ml/benchmark/out:ro"
+      - "./backend/ml/benchmark/out:/app/ml/benchmark/out:ro"
 
   analytics:
     <<: *svc
-    build: {context: ., dockerfile: services/Dockerfile, args: {SERVICE: analytics, APT_PACKAGES: "libgl1 libglib2.0-0"}}
+    build: {context: ./backend/server, dockerfile: services/Dockerfile, args: {SERVICE: analytics, APT_PACKAGES: "libgl1 libglib2.0-0"}}
     environment:
       <<: *env
       ROOT_PATH: /api/analytics
@@ -164,7 +165,7 @@ services:
 
   events:
     <<: *svc
-    build: {context: ., dockerfile: services/Dockerfile, args: {SERVICE: events}}
+    build: {context: ./backend/server, dockerfile: services/Dockerfile, args: {SERVICE: events}}
     environment:
       <<: *env
       ROOT_PATH: /api/events
@@ -172,11 +173,16 @@ services:
 
   notifications:
     <<: *svc
-    build: {context: ., dockerfile: services/Dockerfile, args: {SERVICE: notifications}}
+    build: {context: ./backend/server, dockerfile: services/Dockerfile, args: {SERVICE: notifications}}
     environment:
       <<: *env
       ROOT_PATH: /api/notifications
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+
+  # --- фронтенд (раскомментировать, когда в frontend/ появится Dockerfile: сборка Vite → nginx на 80) ---
+  # frontend:
+  #   build: ./frontend
+  #   restart: unless-stopped
 
 volumes:
   pgdata:

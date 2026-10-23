@@ -33,7 +33,7 @@
 | Факт | Следствие для архитектуры |
 |---|---|
 | SDK работает только на Linux (Ubuntu 18.04+), **Python 3.12.11**, колёса `linux_x86_64` | Компилируем модели в Docker (`python:3.12`) или WSL2, не на «голом» Windows |
-| Маршрут: ONNX → `preliminary_model_conditioning` → калибровка `RegularModel.calibrate_torch` → `quantize` (**INT8**) → `compiler.compile_(TPU_H1M, …, O1/O5)` → файл `.tpu` | Отдельный ML-пайплайн `ml/export` → `ml/compile`; артефакт — `.tpu` с версией |
+| Маршрут: ONNX → `preliminary_model_conditioning` → калибровка `RegularModel.calibrate_torch` → `quantize` (**INT8**) → `compiler.compile_(TPU_H1M, …, O1/O5)` → файл `.tpu` | Отдельный ML-пайплайн `backend/ml/export` → `backend/ml/compile`; артефакт — `.tpu` с версией |
 | **Динамические формы не поддерживаются**, batch фиксируется при компиляции (`*_b1_*.tpu`) | Фиксированный вход (например, 1×3×640×640), letterbox в препроцессинге; при необходимости — отдельные программы b1 и b4 |
 | В списке поддерживаемых моделей есть `yolov8n_pose`, `yolov8m_seg`, `yolo11n_obb`, `yolo12m`, `yolo5s`, `ssd_mobilenet`, `scrfd`. Голова YOLO **отрезается** (`get_sub_model`), декодирование и NMS — на CPU | Берём семейство YOLOv8/11. Постпроцессинг (DFL-декод + NMS) пишем сами на numpy и сверяем с onnxruntime |
 | Рантайм: `pytpu.Device.list_devices()` → `/dev/tpu*`, `device.load(prog.tpu)`, `program.inference()`, `inference.sync({input: np.float32}) → {output: np.float32}` | Код инференса должен **физически выполняться на хосте с TPU**, то есть в Jupyter стенда `hackathon.lin-q.ru`. Рантайм сам квантует float32 ↔ int8 |
@@ -184,7 +184,7 @@ sequenceDiagram
 
 ## 5. Сервисы
 
-Все бэкенд-сервисы написаны на **Python 3.12 + FastAPI**. Причины: один язык с ML, SDK LinQ сам на Python 3.12, общая библиотека `libs/common` (схемы сообщений на Pydantic, JWT, Redis-клиент, логирование, метрики).
+Все бэкенд-сервисы написаны на **Python 3.12 + FastAPI**. Причины: один язык с ML, SDK LinQ сам на Python 3.12, общая библиотека `backend/server/libs/common` (схемы сообщений на Pydantic, JWT, Redis-клиент, логирование, метрики).
 
 ### 5.1 `web` — фронтенд
 
@@ -316,7 +316,7 @@ flowchart LR
     H --> I["model_b1_o5_h1m.tpu<br/>+ meta.json → MinIO / packages"]
 ```
 
-- Всё запускается в контейнере `ml/compile/Dockerfile` (`python:3.12.11-slim` + колёса из `tpu_framework/packets`).
+- Всё запускается в контейнере `backend/ml/compile/Dockerfile` (`python:3.12.11-slim` + колёса из `tpu_framework/packets`).
 - На выходе `.tpu` плюс `meta.json`: имена входов и выходов, формы, пресет, mAP FP32 и INT8, хэш.
 - **Контроль качества квантования**: mAP на валидационном наборе в ONNX FP32, затем в INT8 (эмуляция `as_torch_graph`) и затем на реальном TPU. Допустимая просадка — до 2–3 п.п. mAP.
 
@@ -477,7 +477,7 @@ events(id uuid, camera_id, area_id, zone_id, scenario, severity, started_at, end
 event_actions(id, event_id, user_id, action, comment, at)             -- только добавление
 ```
 
-### 9.2 Сообщения в очередях (Pydantic-модели в `libs/common/messages.py`)
+### 9.2 Сообщения в очередях (Pydantic-модели в `backend/server/libs/common/common/messages.py`)
 
 ```jsonc
 // frames:{shard}
@@ -522,26 +522,30 @@ event_actions(id, event_id, user_id, action, comment, at)             -- тол�
 
 ```
 govnohack/
-├─ artifacts/                  # материалы кейса (как есть)
-├─ docs/ARCHITECTURE.md
-├─ docker-compose.yml          # вся система, кроме tpu-worker
+├─ artifacts/                        # материалы кейса (как есть)
+├─ docs/                             # ARCHITECTURE.md, plans/
+├─ docker-compose.yml                # вся система, кроме tpu-worker
 ├─ .env.example
-├─ libs/common/                # messages.py, auth.py (JWT), redis_bus.py, metrics.py, logging.py
-├─ services/
-│  ├─ auth/        camera/     ingest/
-│  ├─ inference/               # backends/{pytpu,onnx,remote}.py, ml_runtime/{pre,post}.py, worker.py
-│  ├─ analytics/               # tracking.py, fsm.py, scenarios/{fall,proximity,running,phone,...}.py
-│  ├─ events/      notifications/
-├─ web/                        # React SPA
-├─ ml/
-│  ├─ datasets/                # скрипты загрузки и объединения датасетов
-│  ├─ training/                # обучение YOLO
-│  ├─ export/                  # export_onnx.py, cut_head.py
-│  ├─ compile/                 # Dockerfile (python 3.12.11 + packets), compile_tpu.py (O5→O1)
-│  ├─ benchmark/               # bench_tpu.py / ноутбук для стенда → JSON-отчёт
-│  └─ eval/                    # событийные метрики на размеченных роликах
-├─ infra/                      # mediamtx.yml, prometheus.yml, grafana/dashboards, traefik/
-└─ data/                       # (в .gitignore) demo_videos/, calib/, models/
+├─ backend/
+│  ├─ server/                        # бэкенд
+│  │  ├─ libs/common/                # messages.py, bus.py (Redis), auth.py (JWT), metrics.py, logging.py, camconfig.py
+│  │  ├─ services/
+│  │  │  ├─ auth/        camera/     ingest/
+│  │  │  ├─ inference/               # app/, detectors/, backends/{pytpu,onnx}.py, ml_runtime/{pre,post}.py
+│  │  │  ├─ analytics/               # app/, engine/{tracking,fsm,engine}.py, scenarios/{fall,proximity,running,phone,...}.py
+│  │  │  ├─ events/      notifications/
+│  │  ├─ infra/                      # traefik/, mediamtx.yml, cams/, prometheus.yml, grafana/, cameras.yml
+│  │  ├─ tools/                      # replay.py, smoke.py
+│  │  └─ tests/
+│  └─ ml/
+│     ├─ datasets/                   # скрипты загрузки и объединения датасетов
+│     ├─ training/                   # обучение YOLO
+│     ├─ export/                     # export_onnx.py, cut_head.py
+│     ├─ compile/                    # Dockerfile (python 3.12.11 + packets), compile_tpu.py (O5→O1)
+│     ├─ benchmark/                  # bench_tpu.py / ноутбук для стенда → JSON-отчёт (out/)
+│     └─ eval/                       # событийные метрики на размеченных роликах
+├─ frontend/                         # React SPA
+└─ data/                             # (в .gitignore) demo_videos/, calib/, models/, eval/
 ```
 
 ---

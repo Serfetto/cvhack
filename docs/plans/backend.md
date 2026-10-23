@@ -8,13 +8,13 @@
 
 | Что | Где |
 |---|---|
-| Монорепо, `docker-compose.yml`, `.env.example`, инфраструктура | корень, `infra/` |
-| Общая библиотека: сообщения, шина Redis, JWT, метрики, логи | `libs/common/` |
-| `auth`, `camera`, `ingest`, `events`, `notifications` | `services/*` |
-| `inference-service`: обвязка очередей вокруг `ml_runtime` и бэкендов от ML | `services/inference/app/` |
-| `analytics-service`: трекинг, `Track` / `Scene`, реестр сценариев, конечный автомат, склейка треков, снапшоты | `services/analytics/` (кроме `scenarios/`) |
-| Gateway, Prometheus и Grafana, деплой на VPS + OpenVPN | `infra/` |
-| Инструменты: прогон видео через конвейер, seed-данные | `tools/` |
+| Монорепо, `docker-compose.yml`, `.env.example`, инфраструктура | корень, `backend/server/infra/` |
+| Общая библиотека: сообщения, шина Redis, JWT, метрики, логи | `backend/server/libs/common/` |
+| `auth`, `camera`, `ingest`, `events`, `notifications` | `backend/server/services/*` |
+| `inference-service`: обвязка очередей вокруг `ml_runtime` и бэкендов от ML | `backend/server/services/inference/app/` |
+| `analytics-service`: трекинг, `Track` / `Scene`, реестр сценариев, конечный автомат, склейка треков, снапшоты | `backend/server/services/analytics/` (кроме `scenarios/`) |
+| Gateway, Prometheus и Grafana, деплой на VPS + OpenVPN | `backend/server/infra/` |
+| Инструменты: прогон видео через конвейер, seed-данные | `backend/server/tools/` |
 
 ## Приоритеты
 
@@ -41,7 +41,7 @@ Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2 (async) + asyncpg, redis-py (asy
 - [ ] **`docker-compose.yml` с инфраструктурой**:
   - `postgres:16`, `redis:7`, `minio`, `bluenviron/mediamtx`, `traefik:v3`, `prometheus`, `grafana`
   - контейнер `cams`: ffmpeg крутит видео из `data/demo_videos/*.mp4` в `rtsp://mediamtx:8554/camNN`
-- [ ] **`libs/common`** (к 15:30 — от него зависят все):
+- [ ] **`backend/server/libs/common`** (к 15:30 — от него зависят все):
   - `messages.py`: `FrameMsg`, `DetectionsMsg` (`Person`, `Obj`), `ViolationMsg`, `EventOut`, `WsMessage` — поля по ARCHITECTURE §9.2, координаты нормированы 0..1
   - `bus.py`: `publish(stream, msg, maxlen)`, `consume(stream, group, handler)` с `XREADGROUP` / `XACK`, перечитывание непрочитанного при старте, `pubsub(channel)`
   - `auth.py`: проверка JWT (RS256), зависимость FastAPI `current_user(roles=...)`
@@ -61,7 +61,7 @@ Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2 (async) + asyncpg, redis-py (asy
   - прореживание до `analysis_fps`, JPEG (качество 85, длинная сторона ≤ 1280)
   - `SET frame:{cam}:{seq} EX 60` + `XADD frames:{shard} MAXLEN ~ 500`
   - переподключение с увеличивающейся паузой, метрики `ingest_fps`, `ingest_decode_seconds`
-  - конфигурация камер на этом этапе — из YAML (`infra/cameras.yml`), пока нет `camera-service`
+  - конфигурация камер на этом этапе — из YAML (`backend/server/infra/cameras.yml`), пока нет `camera-service`
 - [ ] **`inference-service`**:
   - консьюмер `frames:{shard}` → `ml_runtime` + бэкенд из `INFERENCE_BACKEND` → `XADD detections`
   - метрики по стадиям (`queue`, `pre`, `infer`, `post`)
@@ -76,7 +76,7 @@ Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2 (async) + asyncpg, redis-py (asy
   - доказательство: берём кадр из Redis → рисуем рамку → MinIO `events/YYYY/MM/DD/{event_id}.jpg` + SHA-256
   - `XADD violations` (`started` / `ended`)
   - для проверки до ML — сценарий-заглушка `in_zone` («человек в полигоне ≥ 2 с»)
-- [ ] **До 02:00 отдать ML** протокол `Scenario`, `Track`, `Scene` и `tools/replay.py` (прогоняет видеофайл через конвейер и печатает события с таймкодами).
+- [ ] **До 02:00 отдать ML** протокол `Scenario`, `Track`, `Scene` и `backend/server/tools/replay.py` (прогоняет видеофайл через конвейер и печатает события с таймкодами).
 - [ ] **`event-service`**:
   - консьюмер `violations` → таблица `events`
   - `GET /events` (фильтры: камера, участок, зона, тип, статус, период; пагинация), `GET /events/{id}` (presigned URL снапшота)

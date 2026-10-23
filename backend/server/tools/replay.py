@@ -3,17 +3,17 @@
 
 Примеры:
     # синтетический детектор, правила камеры cam-01 из infra/cameras.yml
-    python tools/replay.py data/demo_videos/cam01.mp4 --camera cam-01
+    python backend/server/tools/replay.py data/demo_videos/cam01.mp4 --camera cam-01
 
     # модель ML на CPU, один сценарий без зоны, свои параметры
-    python tools/replay.py fall01.mp4 --detector onnx --scenario fall --params '{"confirm_s": 1.0}'
+    python backend/server/tools/replay.py fall01.mp4 --detector onnx --scenario fall --params '{"confirm_s": 1.0}'
 
     # сохранить детекции и потом быстро перебирать пороги без нейросети
-    python tools/replay.py fall01.mp4 --detector onnx --scenario fall --save-detections fall01.jsonl
-    python tools/replay.py fall01.mp4 --detections fall01.jsonl --scenario fall --params '{"torso_angle_deg": 50}'
+    python backend/server/tools/replay.py fall01.mp4 --detector onnx --scenario fall --save-detections fall01.jsonl
+    python backend/server/tools/replay.py fall01.mp4 --detections fall01.jsonl --scenario fall --params '{"torso_angle_deg": 50}'
 
     # режим B: горячий путь на стенде LinQ, события — в event-service по HTTP
-    python tools/replay.py rtsp://... --detector pytpu --camera cam-01 --post http://<vps>:8080/api/events --token change-me
+    python backend/server/tools/replay.py rtsp://... --detector pytpu --camera cam-01 --post http://<vps>:8080/api/events --token change-me
 """
 
 from __future__ import annotations
@@ -26,7 +26,8 @@ import time
 from collections import Counter
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[1]   # backend/server
+REPO = ROOT.parents[1]                         # корень репозитория (data/)
 for p in ("libs/common", "services/analytics", "services/inference"):
     sys.path.insert(0, str(ROOT / p))
 
@@ -51,7 +52,7 @@ def main() -> int:
     ap.add_argument("--fps", type=float, help="FPS анализа (по умолчанию — из конфигурации камеры)")
     ap.add_argument("--detector", default="synthetic", help="synthetic | null | onnx | pytpu | remote")
     ap.add_argument("--remote-url", default="")
-    ap.add_argument("--models-dir", default=str(ROOT / "data/models"))
+    ap.add_argument("--models-dir", default=str(REPO / "data/models"))
     ap.add_argument("--models", default="pose")
     ap.add_argument("--detections", help="JSONL с готовыми детекциями (без нейросети)")
     ap.add_argument("--save-detections", help="записать детекции в JSONL")

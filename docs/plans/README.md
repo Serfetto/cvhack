@@ -11,9 +11,9 @@
 
 | Роль | Зона | Код |
 |---|---|---|
-| **ML** | Модели, квантование и компиляция под LinQ, пре- и постпроцессинг, `tpu-worker`, логика сценариев, бенчмарк, метрики качества | `ml/`, `services/inference/ml_runtime/`, `services/inference/backends/`, `services/analytics/scenarios/` |
-| **Бэкенд** | Монорепо, compose, `libs/common`, все сервисы и их обвязка (очереди, БД, API), каркас аналитики (трекинг, конечный автомат, реестр), деплой и VPN | `libs/`, `services/*` (кроме перечисленного у ML), `infra/`, `tools/` |
-| **Фронтенд** | SPA, UX по ролям, скриншоты и демо-сценарий для презентации | `web/` |
+| **ML** | Модели, квантование и компиляция под LinQ, пре- и постпроцессинг, `tpu-worker`, логика сценариев, бенчмарк, метрики качества | `backend/ml/`, `backend/server/services/inference/ml_runtime/`, `backend/server/services/inference/backends/`, `backend/server/services/analytics/scenarios/` |
+| **Бэкенд** | Монорепо, compose, `backend/server/libs/common`, все сервисы и их обвязка (очереди, БД, API), каркас аналитики (трекинг, конечный автомат, реестр), деплой и VPN | `backend/server/libs/`, `backend/server/services/*` (кроме перечисленного у ML), `backend/server/infra/`, `backend/server/tools/` |
+| **Фронтенд** | SPA, UX по ролям, скриншоты и демо-сценарий для презентации | `frontend/` |
 
 Презентация — общая задача. Снимать ли свои ролики, решает команда: кейс этого не требует (подробнее в [ml.md](ml.md)).
 
@@ -21,7 +21,7 @@
 
 | Когда | Что | Кто |
 |---|---|---|
-| 23.10 15:30 | **Контракты зафиксированы**: `libs/common/messages.py`, OpenAPI-заглушки, формат WS-сообщений | Бэкенд + Фронт + ML |
+| 23.10 15:30 | **Контракты зафиксированы**: `backend/server/libs/common/common/messages.py`, OpenAPI-заглушки, формат WS-сообщений | Бэкенд + Фронт + ML |
 | 23.10 16:00 | Чек-лист стенда пройден, **выбран режим инференса** (A1 / A2 / B / C, см. ARCHITECTURE §6.3) | ML |
 | 23.10 17:30 | Прогон выступления на ЧП-1 (5 минут) | Все |
 | **23.10 18:00** | **ЧП-1**: видение решения | Все |
@@ -43,7 +43,7 @@
 | Бэкенд → все | Репозиторий, `docker-compose.yml`, `messages.py`, заглушки сервисов со Swagger | 23.10 15:30 |
 | ML → все | Режим инференса и результаты чек-листа (`docs/stand.md`) | 23.10 16:00 |
 | ML → Бэкенд | `ml_runtime` (pre/post), `OnnxBackend`, модель pose в ONNX | 23.10 23:00 |
-| Бэкенд → ML | Каркас аналитики: протокол `Scenario`, классы `Track` / `Scene`, `tools/replay.py` | 24.10 02:00 |
+| Бэкенд → ML | Каркас аналитики: протокол `Scenario`, классы `Track` / `Scene`, `backend/server/tools/replay.py` | 24.10 02:00 |
 | Бэкенд → Фронт | Рабочие `auth` и `events` + WebSocket на общем стенде | 24.10 09:00 |
 | ML → Бэкенд, Фронт | Каталог сценариев: коды, названия, JSON Schema параметров | 24.10 13:00 |
 | ML → Бэкенд | `tpu-worker` + программы `.tpu` с `meta.json` | 24.10 13:00 |

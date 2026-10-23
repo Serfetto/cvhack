@@ -21,7 +21,7 @@ http:
     ws:            {rule: "Path(`/ws`)",                       service: notifications, entryPoints: [web]}
     live:          {rule: "PathPrefix(`/live`)",               service: mediamtx-hls,  middlewares: [strip-live], entryPoints: [web]}
     media:         {rule: "PathPrefix(`/media`)",              service: minio,         middlewares: [strip-media], entryPoints: [web]}
-    web:           {rule: "PathPrefix(`/`)",                   service: web,           entryPoints: [web], priority: 1}
+    frontend:      {rule: "PathPrefix(`/`)",                   service: frontend,      entryPoints: [web], priority: 1}
 
   services:
     auth:          {loadBalancer: {servers: [{url: "http://auth:8000"}]}}
@@ -33,4 +33,5 @@ http:
     notifications: {loadBalancer: {servers: [{url: "http://notifications:8000"}]}}
     mediamtx-hls:  {loadBalancer: {servers: [{url: "http://mediamtx:8888"}]}}
     minio:         {loadBalancer: {servers: [{url: "http://minio:9000"}]}}
-    web:           {loadBalancer: {servers: [{url: "http://web:80"}]}}
+    # SPA из frontend/ — сервис `frontend` в docker-compose.yml (nginx на 80 порту)
+    frontend:      {loadBalancer: {servers: [{url: "http://frontend:80"}]}}

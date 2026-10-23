@@ -3,7 +3,7 @@ data/
 *.tpu
 *.onnx
 *.pt
-ml/benchmark/out/*.json
+backend/ml/benchmark/out/*.json
 
 # окружение
 .env

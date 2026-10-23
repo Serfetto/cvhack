@@ -12,7 +12,7 @@
 ```bash
 cp .env.example .env            # необязательно: без .env работают значения по умолчанию
 docker compose up -d --build
-python tools/smoke.py           # сквозная проверка: вход → событие по WebSocket → статус → статистика
+python backend/server/tools/smoke.py           # сквозная проверка: вход → событие по WebSocket → статус → статистика
 ```
 
 Без роликов и без моделей всё уже работает: контейнер `cams` крутит тестовую таблицу в RTSP, а детектор
@@ -68,7 +68,7 @@ consumer groups: сообщение подтверждается только п
 ```
 
 С неверным или истёкшим токеном рукопожатие отклоняется (HTTP 403) — клиенту нужно обновить токен и переподключиться.
-`EventOut` — `libs/common/common/messages.py`. Координаты (`bbox`, полигоны зон) нормированы к 0..1.
+`EventOut` — `backend/server/libs/common/common/messages.py`. Координаты (`bbox`, полигоны зон) нормированы к 0..1.
 Статусы: `new → confirmed | false | forwarded → resolved` (допустимые переходы — поле `allowed_statuses`
 в карточке события).
 
@@ -97,24 +97,24 @@ consumer groups: сообщение подтверждается только п
 **tpu-worker на стенде** — это тот же `inference`, только без очередей:
 
 ```bash
-pip install ./libs/common -r services/inference/requirements.txt
-cd services/inference
+pip install ./backend/server/libs/common -r backend/server/services/inference/requirements.txt
+cd backend/server/services/inference
 INFERENCE_BACKEND=pytpu CONSUME=false MODELS_DIR=/path/to/models uvicorn app.main:app --host 0.0.0.0 --port 8000
 # у нас: INFERENCE_BACKEND=remote REMOTE_URL=http://<адрес стенда>:8000 INFERENCE_FALLBACK=onnx
 ```
 
 Режим A2 (стенд сам читает наш Redis): на стенде `CONSUME=true REDIS_URL=redis://:<пароль>@<наш VPN IP>:6379/0`.
-Режим B (всё на стенде): `python tools/replay.py <видео|rtsp> --detector pytpu --camera cam-01 --post http://<vps>:8080/api/events --token <INGEST_TOKEN>`.
+Режим B (всё на стенде): `python backend/server/tools/replay.py <видео|rtsp> --detector pytpu --camera cam-01 --post http://<vps>:8080/api/events --token <INGEST_TOKEN>`.
 
-**Контракт для ML** — `services/inference/detectors/local.py` (функции `ml_runtime`) и
-`services/inference/backends/base.py` (`Backend`, `ModelSpec`, `meta.json`).
+**Контракт для ML** — `backend/server/services/inference/detectors/local.py` (функции `ml_runtime`) и
+`backend/server/services/inference/backends/base.py` (`Backend`, `ModelSpec`, `meta.json`).
 
 ## Как добавить
 
 **Камеру** — в UI или `POST /api/config/cameras` (`source_type`: `rtsp` | `file` | `images`). `ingest` подхватит
-её без перезапуска. Стартовый набор камер — `infra/cameras.yml`.
+её без перезапуска. Стартовый набор камер — `backend/server/infra/cameras.yml`.
 
-**Новый тип нарушения** — файл в `services/analytics/scenarios/`:
+**Новый тип нарушения** — файл в `backend/server/services/analytics/scenarios/`:
 
 ```python
 from scenarios.base import ScenarioBase, Scene, Severity, Track, register
@@ -141,8 +141,8 @@ class PhoneScenario(ScenarioBase):
 Проверить сценарий на ролике без Docker:
 
 ```bash
-python tools/replay.py fall01.mp4 --detector onnx --scenario fall --save-detections fall01.jsonl
-python tools/replay.py fall01.mp4 --detections fall01.jsonl --scenario fall --params '{"confirm_s": 1.0}'
+python backend/server/tools/replay.py fall01.mp4 --detector onnx --scenario fall --save-detections fall01.jsonl
+python backend/server/tools/replay.py fall01.mp4 --detections fall01.jsonl --scenario fall --params '{"confirm_s": 1.0}'
 ```
 
 ## Демо-история для дашборда
@@ -154,22 +154,31 @@ python tools/replay.py fall01.mp4 --detections fall01.jsonl --scenario fall --pa
 
 ```bash
 uv venv --python 3.12 .venv
-uv pip install -e libs/common -r services/analytics/requirements.txt -r services/inference/requirements.txt \
+cd backend/server
+uv pip install --python ../../.venv -e libs/common -r services/analytics/requirements.txt -r services/inference/requirements.txt \
     -r services/auth/requirements.txt -r services/camera/requirements.txt pytest fakeredis
-.venv/Scripts/python -m pytest tests          # Linux/macOS: .venv/bin/python
+../../.venv/Scripts/python -m pytest tests     # Linux/macOS: ../../.venv/bin/python
 ```
 
 Сервис можно запустить локально против инфраструктуры из compose:
-`cd services/events && DATABASE_URL=postgresql+asyncpg://linq:linq@localhost:5432/linq REDIS_URL=redis://:linq-redis@localhost:6379/0 MINIO_ENDPOINT=localhost:9000 AUTH_JWKS_URL=http://localhost:8080/api/auth/.well-known/jwks.json uvicorn app.main:app --port 8003`.
+`cd backend/server/services/events && DATABASE_URL=postgresql+asyncpg://linq:linq@localhost:5432/linq REDIS_URL=redis://:linq-redis@localhost:6379/0 MINIO_ENDPOINT=localhost:9000 AUTH_JWKS_URL=http://localhost:8080/api/auth/.well-known/jwks.json uvicorn app.main:app --port 8003`.
 
 ```
-libs/common/            контракты (messages.py), шина Redis, JWT, метрики, логи, конфигурация камер
-services/<сервис>/app/  FastAPI-приложение сервиса
-services/analytics/engine/     трекинг, конечный автомат, движок (без ввода-вывода)
-services/analytics/scenarios/  сценарии нарушений (плагины)
-services/inference/detectors/  synthetic / local (onnx, pytpu) / remote / fallback
-infra/                  compose-конфиги: Traefik, MediaMTX, Prometheus, Grafana, cameras.yml
-tools/                  replay.py (видео → события офлайн), smoke.py (сквозная проверка)
+backend/
+  server/                          бэкенд
+    libs/common/                   контракты (messages.py), шина Redis, JWT, метрики, логи, конфигурация камер
+    services/<сервис>/app/         FastAPI-приложение сервиса
+    services/analytics/engine/     трекинг, конечный автомат, движок (без ввода-вывода)
+    services/analytics/scenarios/  сценарии нарушений (плагины, пишет ML)
+    services/inference/detectors/  synthetic / local (onnx, pytpu) / remote / fallback
+    infra/                         Traefik, MediaMTX, Prometheus, Grafana, cameras.yml
+    tools/                         replay.py (видео → события офлайн), smoke.py (сквозная проверка)
+    tests/
+  ml/                              датасеты, обучение, экспорт, компиляция под TPU, бенчмарк, метрики
+frontend/                          SPA (React + Vite)
+docs/                              архитектура и планы
+data/                              (не в git) demo_videos/, models/, calib/, eval/
+docker-compose.yml                 вся система одной командой
 ```
 
 ## Лицензии

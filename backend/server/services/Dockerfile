@@ -1,5 +1,5 @@
-# Общий образ для Python-сервисов. Сборка из корня репозитория:
-#   docker build -f services/Dockerfile --build-arg SERVICE=auth .
+# Общий образ для Python-сервисов. Контекст сборки — backend/server:
+#   docker build -f backend/server/services/Dockerfile --build-arg SERVICE=auth backend/server
 FROM python:3.12-slim
 
 ARG SERVICE
