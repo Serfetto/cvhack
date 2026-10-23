@@ -20,3 +20,9 @@ __pycache__/
 *.swp
 *.egg-info/
 build/
+
+# фронтенд
+node_modules/
+frontend/dist/
+.env.local
+compose.local.yml

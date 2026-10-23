@@ -21,7 +21,7 @@ python backend/server/tools/smoke.py           # сквозная проверк
 
 | Что | Адрес |
 |---|---|
-| Шлюз (UI и API) | http://localhost:8080 |
+| Шлюз (UI и API) | http://localhost:8080 — SPA из `frontend/` ([frontend/README.md](frontend/README.md)) |
 | Swagger сервисов | http://localhost:8080/api/{auth,config,events,inference,ingest,analytics,notifications}/docs |
 | WebSocket событий | ws://localhost:8080/ws?access_token=… |
 | Живое видео (HLS) | http://localhost:8080/live/cam01/index.m3u8 |

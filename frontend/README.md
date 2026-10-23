@@ -1,33 +1,84 @@
 # Фронтенд (SPA)
 
-План работ — [docs/plans/frontend.md](../docs/plans/frontend.md). Стек: React 18 + TypeScript + Vite, Ant Design 5.
+План работ — [docs/plans/frontend.md](../docs/plans/frontend.md). Стек: React 18 + TypeScript + Vite, Ant Design 5 (`ru_RU`),
+TanStack Query, Zustand, react-konva, ECharts, hls.js, `@rjsf/antd`, MSW.
 
-## Подключение к бэкенду
+## Запуск
 
-Бэкенд поднимается из корня репозитория: `docker compose up -d --build`. Всё API идёт через шлюз
-`http://localhost:8080`, в dev-режиме Vite проксирует туда:
+**Всё вместе (бэкенд + фронт)** — из корня репозитория:
 
-```ts
-// vite.config.ts
-server: {
-  proxy: {
-    "/api": "http://localhost:8080",
-    "/media": "http://localhost:8080",
-    "/live": "http://localhost:8080",
-    "/ws": { target: "ws://localhost:8080", ws: true },
-  },
-},
+```bash
+docker compose up -d --build                  # фронт собирается Dockerfile (Vite → nginx) и открывается через шлюз
+open http://localhost:8080                    # UI; API, WebSocket, видео и снапшоты — там же
+python backend/server/tools/smoke.py          # сквозная проверка бэкенда
 ```
 
-| Что | Адрес |
+Вход: `admin`, `hse`, `master`, `operator`, `manager`, `auditor`, пароль `demo` (на экране входа — кнопки ролей).
+Для дашборда с историей: `POST /api/events/demo/seed {"days": 14, "per_day": 20}` от `admin`
+(события помечены `demo=true`, на дашборде есть переключатель «Без демо»).
+
+**Разработка фронта** с горячей перезагрузкой — бэкенд в compose, фронт локально:
+
+```bash
+cd frontend
+npm install
+npm run dev            # http://localhost:5173, Vite проксирует /api /media /live /ws на шлюз
+```
+
+Шлюз по умолчанию — `http://localhost:8080`. Если он на другом порту, создать `frontend/.env.local`:
+
+```ini
+VITE_API_TARGET=http://localhost:18080
+```
+
+**Если 8080, 5432, 6379, 9000 или 3000 на машине заняты** — поднять стек на других портах через локальный
+`compose.local.yml` (в `.gitignore`), где у сервисов `ports: !override [...]`:
+
+```bash
+docker compose -f docker-compose.yml -f compose.local.yml up -d --build   # шлюз, например, на :18080
+python backend/server/tools/smoke.py --base http://localhost:18080
+```
+
+**Без бэкенда** (запасной вариант для демо без сети): `npm run dev:mock` — данные из MSW-моков `src/mocks/`, история
+за 14 дней, новые нарушения по «WebSocket» каждые ~10 с, в шапке метка «демо-режим». В production-сборку моки не попадают.
+
+| Команда | Что делает |
 |---|---|
-| Swagger (типы — `openapi-typescript`) | `/api/{auth,config,events,inference,ingest,analytics,notifications}/openapi.json` |
-| Вход | `POST /api/auth/login` → `access_token`, `refresh_token`; пользователи `admin`, `hse`, `master`, `operator`, `manager`, `auditor`, пароль `demo` |
-| Лента событий | `WS /ws?access_token=…` — формат сообщений в корневом README |
-| Снапшот камеры для редактора зон | `GET /api/config/cameras/{id}/snapshot?access_token=…` |
-| Живое видео | `/live/cam01/index.m3u8` (hls.js) |
+| `npm run dev` | dev-сервер, реальный API через прокси |
+| `npm run dev:mock` | dev-сервер на моках, бэкенд не нужен |
+| `npm run build` | проверка типов + сборка в `dist/` |
+| `npm run gen:api` | типы из Swagger сервисов в `src/api/schema/` (бэкенд должен быть поднят) — сверять с `src/api/types.ts` |
 
-## В docker compose
+## Экраны и роли
 
-Шлюз уже отправляет `/` на сервис `frontend:80`. Когда появится `Dockerfile` (сборка Vite → nginx),
-раскомментировать сервис `frontend` в корневом `docker-compose.yml`.
+| Экран | Путь | Роли | Что внутри |
+|---|---|---|---|
+| Вход | `/login` | все | форма, быстрый вход демо-ролями |
+| Лента событий | `/feed` | диспетчер, мастер, ОТ | realtime по WS; критичные — красная плашка со звуком, закреплены, пока не приняты; фильтры; «Подтвердить / Ложное / Передать мастеру»; на телефоне — крупные кнопки |
+| Карточка события | `?event=<id>` на любом экране | все | кадр с рамкой (0..1, скрывается), разметка сервера, клип, статус с комментарием, история; ссылкой можно поделиться |
+| Журнал | `/journal` | все роли | серверная пагинация и сортировка, фильтры в URL, экспорт CSV |
+| Дашборд | `/dashboard` | руководитель, ОТ, юрист | KPI, динамика, типы, тепловая карта час × день, камеры, участки, точность; клик → журнал с фильтром |
+| Камеры | `/cameras` | диспетчер, мастер, ОТ | статус, FPS, HLS или живой снапшот, добавление камеры |
+| Настройка камеры | `/cameras/:id` | ОТ | редактор полигонов на кадре, маска, правила: сценарий из `/scenarios`, параметры по `params_schema`, важность, расписание, «до 12:00 сегодня» |
+| Производительность | `/performance` | ОТ, руководитель, admin | бэкенд и модели, бенчмарк, задержка по стадиям, калькулятор камер на устройство (§6.5), потоки ingest |
+| Личный кабинет | `/profile` | все | профиль, подписки на уведомления, Telegram, смена пароля |
+| Пользователи | `/users` | admin | список, создание, роль, участки |
+
+Права повторяют проверки бэкенда — [src/shared/roles.ts](src/shared/roles.ts).
+
+## Устройство
+
+```
+src/
+  api/        client.ts (fetch + автообновление токена при 401), hooks.ts (TanStack Query), types.ts (контракты бэкенда)
+  store/      auth (токены), live (один WebSocket на приложение: переподключение, watchdog, обновление токена), ui
+  shared/     severity.ts (цвета важности и статусов), roles.ts, format.ts, sound.ts
+  components/ AppLayout, EventDrawer, ZoneEditor (react-konva), RuleModal (@rjsf/antd), EChart, HlsPlayer…
+  pages/      экраны
+  mocks/      MSW: db.ts (данные и агрегаты как в events/stats), handlers.ts (HTTP + WS), scene.ts (синтетические кадры)
+```
+
+- Координаты рамок и полигонов — доли 0..1; в пиксели переводятся только при отрисовке.
+- WebSocket: при отказе рукопожатия (истёк токен) клиент обновляет токен и переподключается с бэкоффом; тишина 60 с — переподключение.
+- Журнал и дашборд сами перезапрашиваются при событиях из WS (не чаще раза в 3 с).
+- Критичные события и эскалации дополнительно приходят системным уведомлением ОС, если вкладка в фоне (кнопка в ленте).

@@ -179,10 +179,10 @@ services:
       ROOT_PATH: /api/notifications
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
 
-  # --- фронтенд (раскомментировать, когда в frontend/ появится Dockerfile: сборка Vite → nginx на 80) ---
-  # frontend:
-  #   build: ./frontend
-  #   restart: unless-stopped
+  # --- фронтенд: сборка Vite → nginx на 80, наружу — через шлюз (http://localhost:8080) ---
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
 
 volumes:
   pgdata:
