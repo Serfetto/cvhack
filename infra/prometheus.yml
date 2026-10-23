@@ -1,0 +1,13 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: services
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["auth:8000", "camera:8000", "ingest:8000", "inference:8000", "analytics:8000", "events:8000", "notifications:8000"]
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: "([^:]+):.*"
+        target_label: service
