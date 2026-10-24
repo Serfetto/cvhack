@@ -58,6 +58,14 @@ sites:
               - id: 4
                 scenario: proximity
                 params: {distance_heights: 1.0, confirm_s: 1.0, cooldown_s: 15}
+              - id: 9
+                scenario: fall
+                severity: critical
+                params: {transition_s: 2.0, cooldown_s: 30}
+              - id: 10
+                scenario: immobile
+                severity: critical
+                params: {still_s: 4.0, cooldown_s: 30}
       - id: 3
         name: "Производственный корпус"
         cameras:

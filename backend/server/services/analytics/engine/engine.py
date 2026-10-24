@@ -172,7 +172,7 @@ class Engine:
             del rt.tracks[tid]
 
         scene = Scene(camera_id=det.camera_id, ts=det.ts, seq=det.seq, w=det.w, h=det.h,
-                      zones=rt.zones, tracks=visible, objects=det.objects)
+                      zones=rt.zones, tracks=visible, objects=det.objects, persons=det.persons)
         now = self.clock(det.ts)
         out: list[Transition] = []
         stepped: set[tuple[int, int | None]] = set()
@@ -209,8 +209,10 @@ class Engine:
                         continue
                     fsm = self._adopt(rt, rule.id, tr, fp, det.ts) or RuleFsm(det.camera_id, rule.id, tid)
                     rt.fsms[key] = fsm
-                bbox = [float(v) for v in tr.bbox] if tr is not None else None
-                res = fsm.step(det.ts, score, fp, bbox=bbox, center=tr.center if tr is not None else None)
+                bbox = [float(v) for v in tr.bbox] if tr is not None else rscene.evidence_bbox
+                center = tr.center if tr is not None else \
+                    ((bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2) if bbox is not None else None
+                res = fsm.step(det.ts, score, fp, bbox=bbox, center=center)
                 stepped.add(key)
                 if res:
                     out.append(self._transition(res, rt, fsm, rule, sc, zone, det))

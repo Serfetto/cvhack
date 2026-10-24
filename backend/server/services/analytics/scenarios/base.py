@@ -35,7 +35,7 @@ import numpy as np
 from shapely.geometry import Point, Polygon
 from shapely.prepared import prep
 
-from common.messages import Obj, ScenarioInfo, Severity
+from common.messages import Obj, Person, ScenarioInfo, Severity
 
 __all__ = [
     "KPT", "Observation", "Track", "Zone", "Scene", "Scenario", "ScenarioBase", "Severity", "Obj",
@@ -192,6 +192,8 @@ class Scene:
     tracks: list[Track]
     objects: list[Obj]
     zone: Zone | None = None
+    persons: list[Person] = field(default_factory=list)  # сырые детекции до трекера
+    evidence_bbox: list[float] | None = None  # рамка, выбранная покадровым сценарием
 
     def objects_of(self, *classes: str, min_score: float = 0.0) -> list[Obj]:
         return [o for o in self.objects if o.cls in classes and o.score >= min_score]
