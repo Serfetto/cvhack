@@ -5,6 +5,7 @@
 - `null` — пустые детекции;
 - `onnx` / `pytpu` — LocalDetector: ml_runtime + бэкенд из backends/;
 - `remote` — tpu-worker на стенде LinQ по HTTP (POST /detect);
+- `broker` — JPEG-запросы и JSON-ответы через RabbitMQ на воркер в Jupyter;
 - FallbackDetector — основной + аварийный (переключение при ошибках).
 """
 

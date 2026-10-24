@@ -45,7 +45,7 @@ def _tail_session(path: str) -> ort.InferenceSession:
 
 
 def _decoded_output(outputs: dict[str, np.ndarray], spec: ModelSpec) -> np.ndarray:
-    # Full ONNX export yields [B, 56, 8400]. A TPU program yields the seven
+    # Full ONNX export yields [B, 56, 8400]. A TPU program yields the three
     # cut tensors; the small ONNX tail completes YOLO's DFL/keypoint decode.
     if len(outputs) == 1:
         candidate = next(iter(outputs.values()))

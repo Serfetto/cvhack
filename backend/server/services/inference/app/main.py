@@ -1,8 +1,4 @@
-"""inference-service: frames:{shard} → детектор (TPU / CPU / удалённый) → detections.
-
-Тот же сервис работает как tpu-worker на стенде LinQ: INFERENCE_BACKEND=pytpu CONSUME=false —
-тогда он не читает очереди, а отвечает на POST /detect.
-"""
+"""inference-service: frames:{shard} → детектор (TPU / CPU / удалённый) → detections."""
 
 from __future__ import annotations
 
@@ -38,6 +34,9 @@ class Settings(BaseServiceSettings):
     inference_fallback: str = "none"
     remote_url: str = ""
     remote_timeout_s: float = 2.0
+    broker_url: str = ""
+    broker_request_queue: str = "cvhack12731.jpeg"
+    broker_timeout_s: float = 3.0
     models_dir: str = "/app/data/models"
     models: str = "pose"
     conf: float = 0.35
@@ -122,7 +121,9 @@ async def publish_status() -> None:
 
 def build_detector():
     kw = dict(models_dir=settings.models_dir, models=[m.strip() for m in settings.models.split(",") if m.strip()],
-              remote_url=settings.remote_url, remote_timeout_s=settings.remote_timeout_s, conf=settings.conf, iou=settings.iou)
+              remote_url=settings.remote_url, remote_timeout_s=settings.remote_timeout_s,
+              broker_url=settings.broker_url, broker_request_queue=settings.broker_request_queue,
+              broker_timeout_s=settings.broker_timeout_s, conf=settings.conf, iou=settings.iou)
     try:
         return create_with_fallback(settings.inference_backend, settings.inference_fallback, **kw)
     except Exception as e:

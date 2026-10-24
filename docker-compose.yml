@@ -150,6 +150,9 @@ services:
       INFERENCE_BACKEND: ${INFERENCE_BACKEND:-synthetic}
       INFERENCE_FALLBACK: ${INFERENCE_FALLBACK:-none}
       REMOTE_URL: ${REMOTE_URL:-}
+      BROKER_URL: ${BROKER_URL:-}
+      BROKER_REQUEST_QUEUE: ${BROKER_REQUEST_QUEUE:-cvhack12731.jpeg}
+      BROKER_TIMEOUT_S: ${BROKER_TIMEOUT_S:-3.0}
       MAX_FRAME_AGE_S: ${MAX_FRAME_AGE_S:-2.0}
     volumes:
       - "./data:/app/data:ro"

@@ -22,8 +22,9 @@
 
 | Что | Где | Контракт |
 |---|---|---|
-| Пре- и постпроцессинг | `backend/server/services/inference/ml_runtime/` | `preprocess`, `postprocess_pose`, `postprocess_detect` — см. docstring `detectors/local.py` |
-| Бэкенды `onnx`, `pytpu` | `backend/server/services/inference/backends/onnx.py`, `pytpu.py` | `Backend`, `ModelSpec`, формат `meta.json` — `backends/base.py` |
+| Пре- и постпроцессинг позы | `backend/server/services/inference/ml_runtime/` | `preprocess`, `postprocess_pose` — см. docstring `detectors/local.py` |
+| ONNX-бэкенд | `backend/server/services/inference/backends/onnx.py` | `Backend`, `ModelSpec`, формат `meta.json` — `backends/base.py` |
+| Брокер LinQ | `backend/server/services/inference/detectors/broker.py`, `backend/ml/worker/` | JPEG → Jupyter → TPU → JSON; [инструкция](worker/README.md) |
 | Сценарии нарушений | `backend/server/services/analytics/scenarios/<код>.py` | `ScenarioBase`, `Track`, `Scene`, `@register` — `scenarios/base.py` |
 
 Проверка сценария на ролике без Docker (детекции можно сохранить и потом быстро перебирать пороги):
@@ -60,6 +61,6 @@ docker run --rm --platform linux/amd64 -v "$PWD:/work" cvhack-linq:2026.9.45 \
 
 Числа из `docs/stand.md` относятся к примеру ResNet50 и не являются скоростью pose. Очередь и 16 TPU общие для всех команд, поэтому задержку нужно мерить от отправки до ответа, явно включая ожидание в очереди.
 
-Пункт 2 технически выполнен: yolov8n-pose скомпилирована и запущена на LinQ TPU. На проверочном кадре CPU и TPU нашли одного человека; уверенность — 0,862 и 0,861. Из 12 последовательных запросов медианная задержка от отправки до ответа — 355 мс. TPU общие для команд, поэтому это не чистое время вычисления. Калибровка была на 32 кадрах, компиляция — O1. В описании выходов замени «семь тензоров» на три.
+Первый запуск pose на TPU выполнен. На проверочном кадре CPU и TPU нашли одного человека; уверенность — 0,862 и 0,861. Из 12 последовательных запросов медианная задержка от отправки до ответа — 355 мс. TPU общие для команд, поэтому это не чистое время вычисления. Калибровка была на 32 кадрах, компиляция — O1; программа отдаёт три тензора.
 
-Следующий этап — подключить этот TPU-вызов к конвейеру через воркер в Jupyter, который принимает JPEG и возвращает готовые детекции. Затем проверить сценарий нарушения на видео.
+Код обмена JPEG/JSON через RabbitMQ подготовлен в `worker/` и детекторе `broker`. Сквозной сетевой тест с бэкендом ожидает восстановления VPN; затем проверить сценарий нарушения на видео.
