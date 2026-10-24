@@ -1,0 +1,33 @@
+{
+  "name": "objects",
+  "task": "detect",
+  "version": "yolov8s-objects-v8.4.0",
+  "input_name": "images",
+  "input_shape": [
+    1,
+    3,
+    640,
+    640
+  ],
+  "output_names": [
+    "/model.22/Concat_output_0",
+    "/model.22/Concat_1_output_0"
+  ],
+  "classes": [
+    "forklift",
+    "pallet_truck",
+    "phone"
+  ],
+  "files": {
+    "onnx": "yolov8s-objects.onnx",
+    "onnx_head": "objects_head.onnx",
+    "onnx_tail": "objects_tail.onnx",
+    "tpu": "yolov8s_objects_b1_o1_h1m_1b310853.tpu"
+  },
+  "source_sha256": "80fc8c10fe1ead558791e6cdeead2e499e4d42546855337567734b2ea2764670",
+  "preprocessing": "RGB letterbox /255",
+  "sdk": "2026.9.45",
+  "preset": "o1",
+  "calibration_images": 160,
+  "activation_percentile": 99.9
+}

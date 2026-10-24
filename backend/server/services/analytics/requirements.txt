@@ -1,0 +1,5 @@
+numpy>=1.26
+shapely>=2.0
+supervision>=0.25
+trackers>=2.0
+opencv-python>=4.9

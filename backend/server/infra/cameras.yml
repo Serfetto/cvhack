@@ -1,0 +1,103 @@
+# Стартовая конфигурация камер.
+# - camera-service при первом запуске (пустая БД) заливает её в PostgreSQL — дальше правки только через API/UI;
+# - ingest и analytics читают её, только если camera-service ещё не опубликовал конфигурацию в Redis.
+# Координаты зон нормированы 0..1 (x — вправо, y — вниз). source_type: rtsp | file | images.
+sites:
+  - id: 1
+    name: "Завод «Моспром-Демо»"
+    address: "Москва"
+    areas:
+      - id: 1
+        name: "Цех №1 — штамповка"
+        cameras:
+          - id: cam-01
+            name: "Камера 1"
+            source_type: rtsp
+            source_url: rtsp://mediamtx:8554/cam01
+            analysis_fps: 5
+            zones:
+              - id: 1
+                name: "Опасная зона пресса"
+                kind: danger
+                polygon: [[0.0, 0.3], [0.37, 0.3], [0.37, 1.0], [0.0, 1.0]]
+            rules:
+              - id: 1
+                scenario: in_zone
+                zone_id: 1
+                severity: high
+                params: {confirm_s: 2.0, cooldown_s: 10}
+              - id: 3
+                scenario: proximity
+                params: {distance_heights: 1.0, confirm_s: 1.0, cooldown_s: 15}
+          - id: cam-02
+            name: "Камера 2"
+            source_type: rtsp
+            source_url: rtsp://mediamtx:8554/cam02
+            analysis_fps: 5
+            zones:
+              - id: 2
+                name: "Проезд погрузчиков"
+                kind: forbidden
+                polygon: [[0.6, 0.4], [1.0, 0.4], [1.0, 1.0], [0.6, 1.0]]
+            rules:
+              - id: 2
+                scenario: in_zone
+                zone_id: 2
+                severity: critical
+                params: {confirm_s: 1.5, cooldown_s: 10}
+      - id: 2
+        name: "Склад готовой продукции"
+        cameras:
+          - id: cam-03
+            name: "Камера 3"
+            source_type: rtsp
+            source_url: rtsp://mediamtx:8554/cam03
+            analysis_fps: 5
+            zones: []
+            rules:
+              - id: 4
+                scenario: proximity
+                params: {distance_heights: 1.0, confirm_s: 1.0, cooldown_s: 15}
+      - id: 3
+        name: "Производственный корпус"
+        cameras:
+          - id: cam-04
+            name: "Камера 4"
+            source_type: rtsp
+            source_url: rtsp://mediamtx:8554/cam04
+            analysis_fps: 5
+            zones: []
+            rules:
+              - id: 5
+                scenario: proximity
+                params: {distance_heights: 1.0, confirm_s: 1.0, cooldown_s: 15}
+          - id: cam-05
+            name: "Камера 5"
+            source_type: rtsp
+            source_url: rtsp://mediamtx:8554/cam05
+            analysis_fps: 5
+            zones: []
+            rules:
+              - id: 6
+                scenario: proximity
+                params: {distance_heights: 1.0, confirm_s: 1.0, cooldown_s: 15}
+          - id: cam-06
+            name: "Камера 6"
+            source_type: rtsp
+            source_url: rtsp://mediamtx:8554/cam06
+            analysis_fps: 5
+            zones: []
+            rules:
+              - id: 7
+                scenario: proximity
+                params: {distance_heights: 1.0, confirm_s: 1.0, cooldown_s: 15}
+          - id: cam-07
+            name: "Камера 7"
+            source_type: rtsp
+            source_url: rtsp://mediamtx:8554/cam07
+            analysis_fps: 5
+            zones: []
+            rules:
+              - id: 8
+                scenario: proximity
+                params: {distance_heights: 1.0, confirm_s: 1.0, cooldown_s: 15}

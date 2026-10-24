@@ -1,0 +1,41 @@
+# данные и артефакты моделей; из data/models в git — только то, что нужно для запуска:
+# meta.json, полная ONNX (CPU и аварийный режим), ONNX-хвост и программа TPU (воркер стенда), веса .pt
+*.tpu
+*.onnx
+*.pt
+data/*
+!data/models/
+data/models/**
+!data/models/*/
+!data/models/*/meta.json
+!data/models/*/*.tpu
+!data/models/*/*_tail.onnx
+!data/models/pose/yolov8n-pose.onnx
+!data/models/objects/yolov8s-objects.onnx
+!data/models/objects/yolov8s-objects.pt
+backend/ml/benchmark/out/*.json
+
+
+# окружение
+.env
+artifacts/
+secrets/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.egg-info/
+build/
+
+# фронтенд
+node_modules/
+frontend/dist/
+.env.local
+compose.local.yml

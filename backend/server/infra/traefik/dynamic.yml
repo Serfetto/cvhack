@@ -1,0 +1,37 @@
+# Маршруты шлюза. Префикс /api/<сервис> срезается, сервис видит свои пути (/login, /events, …),
+# а Swagger открывается по /api/<сервис>/docs (у сервиса задан ROOT_PATH).
+http:
+  middlewares:
+    strip-api:
+      stripPrefixRegex:
+        regex: ["^/api/[a-z]+"]
+    strip-live:
+      stripPrefix: {prefixes: ["/live"]}
+    strip-media:
+      stripPrefix: {prefixes: ["/media"]}
+
+  routers:
+    auth:          {rule: "PathPrefix(`/api/auth`)",          service: auth,          middlewares: [strip-api], entryPoints: [web]}
+    camera:        {rule: "PathPrefix(`/api/config`)",        service: camera,        middlewares: [strip-api], entryPoints: [web]}
+    events:        {rule: "PathPrefix(`/api/events`)",        service: events,        middlewares: [strip-api], entryPoints: [web]}
+    inference:     {rule: "PathPrefix(`/api/inference`)",     service: inference,     middlewares: [strip-api], entryPoints: [web]}
+    ingest:        {rule: "PathPrefix(`/api/ingest`)",        service: ingest,        middlewares: [strip-api], entryPoints: [web]}
+    analytics:     {rule: "PathPrefix(`/api/analytics`)",     service: analytics,     middlewares: [strip-api], entryPoints: [web]}
+    notifications: {rule: "PathPrefix(`/api/notifications`)", service: notifications, middlewares: [strip-api], entryPoints: [web]}
+    ws:            {rule: "Path(`/ws`)",                       service: notifications, entryPoints: [web]}
+    live:          {rule: "PathPrefix(`/live`)",               service: mediamtx-hls,  middlewares: [strip-live], entryPoints: [web]}
+    media:         {rule: "PathPrefix(`/media`)",              service: minio,         middlewares: [strip-media], entryPoints: [web]}
+    frontend:      {rule: "PathPrefix(`/`)",                   service: frontend,      entryPoints: [web], priority: 1}
+
+  services:
+    auth:          {loadBalancer: {servers: [{url: "http://auth:8000"}]}}
+    camera:        {loadBalancer: {servers: [{url: "http://camera:8000"}]}}
+    events:        {loadBalancer: {servers: [{url: "http://events:8000"}]}}
+    inference:     {loadBalancer: {servers: [{url: "http://inference:8000"}]}}
+    ingest:        {loadBalancer: {servers: [{url: "http://ingest:8000"}]}}
+    analytics:     {loadBalancer: {servers: [{url: "http://analytics:8000"}]}}
+    notifications: {loadBalancer: {servers: [{url: "http://notifications:8000"}]}}
+    mediamtx-hls:  {loadBalancer: {servers: [{url: "http://mediamtx:8888"}]}}
+    minio:         {loadBalancer: {servers: [{url: "http://minio:9000"}]}}
+    # SPA из frontend/ — сервис `frontend` в docker-compose.yml (nginx на 80 порту)
+    frontend:      {loadBalancer: {servers: [{url: "http://frontend:80"}]}}

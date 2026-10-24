@@ -1,0 +1,220 @@
+# Вся система, кроме tpu-worker (он работает на стенде LinQ). Запуск из корня репозитория: docker compose up -d --build
+# Код: backend/server (сервисы, общая библиотека, инфраструктура), backend/ml (модели), frontend (SPA)
+# Шлюз: http://localhost:8080  ·  Swagger: /api/<auth|config|events|inference|ingest|analytics|notifications>/docs
+# Grafana: http://localhost:3000  ·  Prometheus: http://localhost:9090  ·  MinIO: http://localhost:9001
+name: linq-safety
+
+x-env: &env
+  REDIS_URL: redis://:${REDIS_PASSWORD:-linq-redis}@redis:6379/0
+  DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-linq}:${POSTGRES_PASSWORD:-linq}@postgres:5432/${POSTGRES_DB:-linq}
+  MINIO_ENDPOINT: minio:9000
+  MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+  MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+  MINIO_BUCKET: ${MINIO_BUCKET:-linq}
+  AUTH_JWKS_URL: http://auth:8000/.well-known/jwks.json
+  FRAME_SHARDS: ${FRAME_SHARDS:-1}
+  APP_TZ: Europe/Moscow
+
+x-svc: &svc
+  restart: unless-stopped
+  env_file:
+    - path: .env
+      required: false
+  depends_on: &deps
+    redis: {condition: service_healthy}
+    postgres: {condition: service_healthy}
+    minio: {condition: service_healthy}
+
+services:
+  # --- инфраструктура -----------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-linq}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-linq}
+      POSTGRES_DB: ${POSTGRES_DB:-linq}
+      TZ: Europe/Moscow
+    volumes: [pgdata:/var/lib/postgresql/data]
+    ports: ["5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 3s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-linq-redis}", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes: [redisdata:/data]
+    # порт открыт для режима A2 (tpu-worker со стенда пишет в наш Redis) — пароль обязателен
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-linq-redis}", "--no-auth-warning", "ping"]
+      interval: 3s
+      retries: 30
+
+  minio:
+    # официальные образы minio/minio больше не публикуются в Docker Hub — берём сборку Bitnami
+    image: bitnamilegacy/minio:2025.4.22
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_CONSOLE_PORT_NUMBER: "9001"
+    volumes: [miniodata:/bitnami/minio/data]
+    ports: ["9000:9000", "9001:9001"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9000/minio/health/live"]
+      interval: 3s
+      retries: 30
+
+  mediamtx:
+    image: bluenviron/mediamtx:1.9.3
+    restart: unless-stopped
+    volumes: ["./backend/server/infra/mediamtx.yml:/mediamtx.yml:ro"]
+    ports: ["8554:8554", "8888:8888", "8889:8889"]
+
+  cams:
+    build: ./backend/server/infra/cams
+    restart: unless-stopped
+    environment:
+      CAMS: ${DEMO_CAMS:-cam01 cam02 cam03}
+    volumes: ["./data/demo_videos:/videos:ro"]
+    depends_on: [mediamtx]
+
+  gateway:
+    image: traefik:v3.1
+    restart: unless-stopped
+    command:
+      - --entrypoints.web.address=:80
+      - --providers.file.filename=/etc/traefik/dynamic.yml
+      - --providers.file.watch=true
+      - --api.dashboard=true
+      - --api.insecure=true
+      - --log.level=WARN
+    volumes: ["./backend/server/infra/traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro"]
+    ports: ["${GATEWAY_PORT:-8080}:80", "8081:8080"]
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    restart: unless-stopped
+    volumes: ["./backend/server/infra/prometheus.yml:/etc/prometheus/prometheus.yml:ro"]
+    ports: ["9090:9090"]
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    restart: unless-stopped
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/linq.json
+    volumes:
+      - ./backend/server/infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./backend/server/infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports: ["3000:3000"]
+    depends_on: [prometheus]
+
+  # --- сервисы --------------------------------------------------------------------------
+  auth:
+    <<: *svc
+    build: {context: ./backend/server, dockerfile: services/Dockerfile, args: {SERVICE: auth}}
+    environment:
+      <<: *env
+      ROOT_PATH: /api/auth
+      JWT_KEY_PATH: /data/keys/jwt.pem
+    volumes: [authkeys:/data/keys]
+
+  camera:
+    <<: *svc
+    build: {context: ./backend/server, dockerfile: services/Dockerfile, args: {SERVICE: camera}}
+    environment:
+      <<: *env
+      ROOT_PATH: /api/config
+
+  ingest:
+    <<: *svc
+    build: {context: ./backend/server, dockerfile: services/Dockerfile, args: {SERVICE: ingest, APT_PACKAGES: ffmpeg}}
+    environment:
+      <<: *env
+      ROOT_PATH: /api/ingest
+    volumes: ["./data:/app/data:ro"]
+
+  inference:
+    <<: *svc
+    build: {context: ./backend/server, dockerfile: services/Dockerfile, args: {SERVICE: inference}}
+    environment:
+      <<: *env
+      ROOT_PATH: /api/inference
+      INFERENCE_BACKEND: ${INFERENCE_BACKEND:-synthetic}
+      INFERENCE_FALLBACK: ${INFERENCE_FALLBACK:-none}
+      REMOTE_URL: ${REMOTE_URL:-}
+      BROKER_URL: ${BROKER_URL:-amqp://guest:guest@linq-vpn:5672/%2F}   # RabbitMQ стенда через проброс в linq-vpn
+      BROKER_REQUEST_QUEUE: ${BROKER_REQUEST_QUEUE:-cvhack12731.jpeg}
+      BROKER_TIMEOUT_S: ${BROKER_TIMEOUT_S:-3.0}
+      INFERENCE_CONCURRENCY: ${INFERENCE_CONCURRENCY:-1}
+      MODELS: ${INFERENCE_MODELS:-pose}   # для onnx/pytpu и аварийного режима: модели из data/models
+      MAX_FRAME_AGE_S: ${MAX_FRAME_AGE_S:-2.0}
+    volumes:
+      - "./data:/app/data:ro"
+      - "./backend/ml/benchmark/out:/app/ml/benchmark/out:ro"
+
+  analytics:
+    <<: *svc
+    build: {context: ./backend/server, dockerfile: services/Dockerfile, args: {SERVICE: analytics, APT_PACKAGES: "libgl1 libglib2.0-0"}}
+    environment:
+      <<: *env
+      ROOT_PATH: /api/analytics
+      TRACKER: ${TRACKER:-bytetrack}
+
+  events:
+    <<: *svc
+    build: {context: ./backend/server, dockerfile: services/Dockerfile, args: {SERVICE: events}}
+    environment:
+      <<: *env
+      ROOT_PATH: /api/events
+      INGEST_TOKEN: ${INGEST_TOKEN:-change-me}
+
+  notifications:
+    <<: *svc
+    build: {context: ./backend/server, dockerfile: services/Dockerfile, args: {SERVICE: notifications}}
+    environment:
+      <<: *env
+      ROOT_PATH: /api/notifications
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+
+  # --- доступ к стенду LinQ (по запросу: docker compose --profile linq up -d linq-vpn) -----------
+  # VPN поднят только внутри этого контейнера; работа со стендом: docker compose exec linq-vpn ljup --help
+  # остальным сервисам он отдаёт RabbitMQ стенда как linq-vpn:5672 (LINQ_FORWARDS в entrypoint.sh)
+  # нужны secrets/vpn-auth.txt (логин и пароль VPN по строке) и secrets/jupyter.env (JUPYTER_USER/PASSWORD)
+  linq-vpn:
+    profiles: [linq]
+    build: ./backend/server/infra/linq-vpn
+    restart: unless-stopped
+    cap_add: [NET_ADMIN]
+    devices: ["/dev/net/tun:/dev/net/tun"]
+    env_file:
+      - path: secrets/jupyter.env
+        required: false
+    environment:
+      LJUP_STATE: /work/secrets/ljup-state.json   # API-токен и id ядра переживают пересоздание контейнера
+    volumes:
+      - ./artifacts/Hakathon.ovpn:/vpn/client.ovpn:ro
+      - ./secrets/vpn-auth.txt:/vpn/auth.txt:ro
+      - ./:/work
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-m", "5", "-o", "/dev/null", "http://hackathon.lin-q.ru/hub/api"]
+      interval: 15s
+      retries: 5
+
+  # --- фронтенд: сборка Vite → nginx на 80, наружу — через шлюз (http://localhost:8080) ---
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:
+  authkeys:

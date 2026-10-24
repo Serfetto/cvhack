@@ -1,0 +1,21 @@
+# MediaMTX: принимает RTSP от контейнера cams (имитация камер), отдаёт RTSP в ingest и HLS/WebRTC в браузер
+logLevel: warn
+
+rtsp: yes
+rtspAddress: :8554
+protocols: [tcp]
+
+hls: yes
+hlsAddress: :8888
+hlsAlwaysRemux: yes
+hlsVariant: mpegts
+hlsAllowOrigin: "*"
+
+webrtc: yes
+webrtcAddress: :8889
+
+rtmp: no
+srt: no
+
+paths:
+  "~^.*$": {}

@@ -1,0 +1,48 @@
+{
+  "name": "linq-safety-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:mock": "vite --mode mock",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b --noEmit",
+    "gen:api": "node scripts/gen-api.mjs"
+  },
+  "msw": {
+    "workerDirectory": [
+      "public"
+    ]
+  },
+  "dependencies": {
+    "@ant-design/icons": "^5.6.1",
+    "@fontsource-variable/inter": "^5.3.0",
+    "@rjsf/antd": "^5.24.13",
+    "@rjsf/core": "^5.24.13",
+    "@rjsf/utils": "^5.24.13",
+    "@rjsf/validator-ajv8": "^5.24.13",
+    "@tanstack/react-query": "^5.104.5",
+    "antd": "^5.29.3",
+    "dayjs": "^1.11.23",
+    "echarts": "^5.6.0",
+    "hls.js": "^1.7.3",
+    "konva": "^9.3.22",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-konva": "^18.2.16",
+    "react-router-dom": "^6.30.6",
+    "zustand": "^4.5.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.7.0",
+    "msw": "^2.15.0",
+    "openapi-typescript": "^7.13.0",
+    "typescript": "^5.9.3",
+    "vite": "^5.4.21"
+  }
+}

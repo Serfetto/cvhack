@@ -1,0 +1,7 @@
+apiVersion: 1
+providers:
+  - name: linq
+    folder: LinQ
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards
