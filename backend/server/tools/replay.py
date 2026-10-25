@@ -54,6 +54,7 @@ def main() -> int:
     ap.add_argument("--remote-url", default="")
     ap.add_argument("--models-dir", default=str(REPO / "data/models"))
     ap.add_argument("--models", default="pose")
+    ap.add_argument("--no-fire", action="store_true", help="не искать огонь по цвету и мерцанию")
     ap.add_argument("--detections", help="JSONL с готовыми детекциями (без нейросети)")
     ap.add_argument("--save-detections", help="записать детекции в JSONL")
     ap.add_argument("--tracker", default="bytetrack", help="bytetrack | iou")
@@ -106,6 +107,10 @@ def main() -> int:
         from detectors import create_detector
 
         detector = create_detector(args.detector, models_dir=args.models_dir, models=args.models.split(","), remote_url=args.remote_url)
+        if not args.no_fire:
+            from detectors.fire import FireDetector
+
+            detector = FireDetector(detector)
     save = open(args.save_detections, "w", encoding="utf-8") if args.save_detections else None
 
     http = None
