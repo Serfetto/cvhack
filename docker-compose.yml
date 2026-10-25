@@ -155,6 +155,7 @@ services:
       BROKER_TIMEOUT_S: ${BROKER_TIMEOUT_S:-3.0}
       INFERENCE_CONCURRENCY: ${INFERENCE_CONCURRENCY:-1}
       MODELS: ${INFERENCE_MODELS:-pose}   # для onnx/pytpu и аварийного режима: модели из data/models
+      FIRE_DETECT: ${FIRE_DETECT:-true}
       MAX_FRAME_AGE_S: ${MAX_FRAME_AGE_S:-2.0}
     volumes:
       - "./data:/app/data:ro"

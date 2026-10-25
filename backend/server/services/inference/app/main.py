@@ -23,7 +23,8 @@ from common.messages import DetectionsMsg, FrameMsg, Keys, Streams
 from common.metrics import LATENCY_BUCKETS
 from common.service import Supervisor, create_app
 from common.settings import BaseServiceSettings
-from detectors import DetectResult, FallbackDetector, create_detector, create_with_fallback
+from detectors import DetectResult, create_detector, create_with_fallback
+from detectors.fire import FireDetector
 
 log = get_logger(__name__)
 
@@ -44,6 +45,8 @@ class Settings(BaseServiceSettings):
     models: str = "pose"
     conf: float = 0.35
     iou: float = 0.5
+    # огонь по цвету и мерцанию (без нейросети) поверх любого бэкенда — для сценария fire
+    fire_detect: bool = True
     max_frame_age_s: float = 2.0
     shards: str = "all"
     consume: bool = True
@@ -134,7 +137,7 @@ async def process_frame(msg: FrameMsg) -> None:
 
 async def publish_status() -> None:
     while True:
-        fb = isinstance(detector, FallbackDetector) and detector.active_fallback
+        fb = bool(getattr(detector, "active_fallback", False))
         FALLBACK.set(1 if fb else 0)
         FPS.set(current_fps())
         status = {"backend": detector.name, "fallback_active": fb, "fps": current_fps(), "updated_at": time.time()}
@@ -148,12 +151,13 @@ def build_detector():
               broker_url=settings.broker_url, broker_request_queue=settings.broker_request_queue,
               broker_timeout_s=settings.broker_timeout_s, conf=settings.conf, iou=settings.iou)
     try:
-        return create_with_fallback(settings.inference_backend, settings.inference_fallback, **kw)
+        det = create_with_fallback(settings.inference_backend, settings.inference_fallback, **kw)
     except Exception as e:
         if settings.inference_fallback in ("", "none", settings.inference_backend):
             raise
         log.error("primary_backend_init_failed", backend=settings.inference_backend, error=str(e), using=settings.inference_fallback)
-        return create_detector(settings.inference_fallback, **kw)
+        det = create_detector(settings.inference_fallback, **kw)
+    return FireDetector(det) if settings.fire_detect else det
 
 
 @asynccontextmanager
